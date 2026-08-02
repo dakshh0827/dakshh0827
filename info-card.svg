@@ -1,0 +1,182 @@
+<svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="490"
+    height="370"
+    viewBox="0 0 490 370">
+
+
+    <rect
+        x="1"
+        y="1"
+        width="488"
+        height="368"
+        rx="12"
+        fill="#0d1117"
+        stroke="#30363d"
+    />
+
+<circle cx="22" cy="22" r="5" fill="#ff5f56"/>
+<circle cx="40" cy="22" r="5" fill="#ffbd2e"/>
+<circle cx="58" cy="22" r="5" fill="#27c93f"/>
+
+    <text
+        x="245.0"
+        y="27"
+        text-anchor="middle"
+        font-family="monospace"
+        font-size="12"
+        fill="#8b949e">
+        daksh@github:~
+    </text>
+
+
+    <line
+        x1="0"
+        y1="43"
+        x2="490"
+        y2="43"
+        stroke="#30363d"
+    />
+
+
+    <text
+        x="25"
+        y="78"
+        font-family="monospace"
+        font-size="15"
+        font-weight="bold"
+        fill="#39d353">
+        dakshh0827@github
+    </text>
+
+
+    <text
+        x="25"
+        y="100"
+        font-family="monospace"
+        font-size="13"
+        fill="#8b949e">
+        ------------------------------
+    </text>
+
+
+        <text
+            x="25"
+            y="135"
+            font-family="monospace"
+            font-size="13"
+            >
+            
+            <tspan
+                fill="#39d353"
+                font-weight="bold">
+                Now
+            </tspan>
+
+            <tspan fill="#c9d1d9">
+                : Placement prep + building projects
+            </tspan>
+
+        </text>
+        
+
+        <text
+            x="25"
+            y="170"
+            font-family="monospace"
+            font-size="13"
+            >
+            
+            <tspan
+                fill="#58a6ff"
+                font-weight="bold">
+                Prev
+            </tspan>
+
+            <tspan fill="#c9d1d9">
+                : Full-stack development
+            </tspan>
+
+        </text>
+        
+
+        <text
+            x="25"
+            y="205"
+            font-family="monospace"
+            font-size="13"
+            >
+            
+            <tspan
+                fill="#bc8cff"
+                font-weight="bold">
+                Stack
+            </tspan>
+
+            <tspan fill="#c9d1d9">
+                : Java · React · Node.js · MongoDB
+            </tspan>
+
+        </text>
+        
+
+        <text
+            x="25"
+            y="240"
+            font-family="monospace"
+            font-size="13"
+            >
+            
+            <tspan
+                fill="#f0883e"
+                font-weight="bold">
+                Focus
+            </tspan>
+
+            <tspan fill="#c9d1d9">
+                : DSA · Backend · System Design
+            </tspan>
+
+        </text>
+        
+
+        <text
+            x="25"
+            y="275"
+            font-family="monospace"
+            font-size="13"
+            >
+            
+            <tspan
+                fill="#39d353"
+                font-weight="bold">
+                Build
+            </tspan>
+
+            <tspan fill="#c9d1d9">
+                : Agentra · MERN · Next.js
+            </tspan>
+
+        </text>
+        
+
+        <text
+            x="25"
+            y="310"
+            font-family="monospace"
+            font-size="13"
+            >
+            
+            <tspan
+                fill="#58a6ff"
+                font-weight="bold">
+                Status
+            </tspan>
+
+            <tspan fill="#c9d1d9">
+                : Open to software engineering roles
+            </tspan>
+
+        </text>
+        
+</svg>

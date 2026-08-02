@@ -1,0 +1,71 @@
+# ==============================
+# Python
+# ==============================
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Python tooling/cache
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ==============================
+# Local source images
+# ==============================
+# Don't publish the original/preprocessed photos
+source_photo.png
+source-photo.png
+source-prepped.png
+
+# Other local image variants
+source_photo.jpg
+source-photo.jpg
+source_photo.jpeg
+source-photo.jpeg
+
+# ==============================
+# OS files
+# ==============================
+.DS_Store
+Thumbs.db
+
+# Linux temporary files
+*~
+.directory
+
+# ==============================
+# IDE / Editor
+# ==============================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ==============================
+# Environment / Secrets
+# ==============================
+.env
+.env.*
+!.env.example
+
+# ==============================
+# Logs
+# ==============================
+*.log
+logs/
+
+# ==============================
+# Temporary files
+# ==============================
+tmp/
+temp/
+*.tmp
