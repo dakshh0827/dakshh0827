@@ -1,32 +1,53 @@
 from PIL import Image
 import html
+import os
+
+
+# ============================================================
+# CONFIGURATION
+# ============================================================
 
 INPUT = "source-prepped.png"
 OUTPUT = "avi-ascii.svg"
 
-# Number of ASCII characters horizontally
+# ASCII grid width
 COLS = 100
 
-# IMPORTANT: bright -> dark
+# Bright -> dark
+# Leading space = white/background disappears
 RAMP = " .`:-=+*cs#%@"
 
 FONT_SIZE = 10
 CHAR_WIDTH = 6
 LINE_HEIGHT = 10
 
-# Light gray ASCII on dark background
 TEXT_COLOR = "#b8b8b8"
 BACKGROUND = "#0d1117"
 
+# ------------------------------------------------------------
+# TYPEWRITER SPEED
+# ------------------------------------------------------------
+
+# Seconds between each CHARACTER
+CHAR_DELAY = 0.001
+
+# Small pause after finishing each ROW
+ROW_PAUSE = 0.005
+
+# Cursor size
+CURSOR_WIDTH = 5
+
+STATIC = os.environ.get("STATIC") == "1"
+
+
+# ============================================================
+# BRIGHTNESS -> ASCII
+# ============================================================
 
 def brightness_to_char(value):
     """
-    value:
-        255 = white
-        0   = black
-
-    White -> space
-    Black -> @
+    255 = white -> space
+    0   = black -> dense character
     """
 
     normalized = 1 - (value / 255.0)
@@ -38,54 +59,64 @@ def brightness_to_char(value):
     return RAMP[index]
 
 
-# ---------------------------------------
-# Load prepped image
-# ---------------------------------------
+# ============================================================
+# LOAD IMAGE
+# ============================================================
 
 img = Image.open(INPUT).convert("L")
 
 aspect_ratio = img.height / img.width
 
-# Compensate for character dimensions
-rows = int(
-    COLS * aspect_ratio * 0.52
+# Correct for monospace character proportions
+rows = max(
+    1,
+    int(
+        COLS
+        * aspect_ratio
+        * 0.52
+    )
 )
 
-img = img.resize((COLS, rows))
+img = img.resize(
+    (COLS, rows)
+)
 
 pixels = img.load()
 
 
-# ---------------------------------------
-# Convert pixels -> ASCII
-# ---------------------------------------
+# ============================================================
+# IMAGE -> ASCII GRID
+# ============================================================
 
-ascii_rows = []
+ascii_grid = []
 
-for y in range(rows):
+for row in range(rows):
 
-    line = ""
+    characters = []
 
-    for x in range(COLS):
+    for col in range(COLS):
 
-        brightness = pixels[x, y]
+        brightness = pixels[col, row]
 
-        char = brightness_to_char(brightness)
+        char = brightness_to_char(
+            brightness
+        )
 
-        line += char
+        characters.append(char)
 
-    ascii_rows.append(line)
+    ascii_grid.append(characters)
 
 
-# ---------------------------------------
-# SVG dimensions
-# ---------------------------------------
+# ============================================================
+# SVG DIMENSIONS
+# ============================================================
 
 WIDTH = COLS * CHAR_WIDTH
 HEIGHT = rows * LINE_HEIGHT
 
 
 svg = []
+
 
 svg.append(
     f'''<svg
@@ -97,136 +128,216 @@ svg.append(
 )
 
 
-# ---------------------------------------
-# Background
-# ---------------------------------------
+# ============================================================
+# BACKGROUND
+# ============================================================
 
 svg.append(
-    f'<rect width="100%" height="100%" fill="{BACKGROUND}"/>'
+    f'''
+<rect
+    width="{WIDTH}"
+    height="{HEIGHT}"
+    fill="{BACKGROUND}"
+/>
+'''
 )
 
 
-# ---------------------------------------
-# Create animated clip paths
-# ---------------------------------------
+# ============================================================
+# ASCII CHARACTERS
+#
+# IMPORTANT:
+#
+# Every character is an INDIVIDUAL SVG <text>.
+#
+# There are NO:
+#   clipPaths
+#   masks
+#   width animations
+#
+# Characters literally appear one at a time.
+# ============================================================
 
-svg.append("<defs>")
-
-
-for i in range(rows):
-
-    y = i * LINE_HEIGHT
-
-    delay = i * 0.035
-
-    svg.append(
-        f'''
-        <clipPath id="clip-{i}">
-
-            <rect
-                x="0"
-                y="{y}"
-                width="0"
-                height="{LINE_HEIGHT + 2}">
-
-                <animate
-                    attributeName="width"
-                    from="0"
-                    to="{WIDTH}"
-                    dur="1.2s"
-                    begin="{delay}s"
-                    fill="freeze"
-                />
-
-            </rect>
-
-        </clipPath>
-        '''
-    )
+current_time = 0.0
 
 
-svg.append("</defs>")
+for row in range(rows):
+
+    y = (
+        row + 1
+    ) * LINE_HEIGHT
+
+    for col in range(COLS):
+
+        char = ascii_grid[row][col]
+
+        x = col * CHAR_WIDTH
 
 
-# ---------------------------------------
-# ASCII text
-# ---------------------------------------
+        # ----------------------------------------------------
+        # Spaces don't need to be rendered.
+        #
+        # But their typing time still passes so that character
+        # positions remain correct.
+        # ----------------------------------------------------
 
-for i, line in enumerate(ascii_rows):
+        if char != " ":
 
-    y = (i + 1) * LINE_HEIGHT
+            escaped = html.escape(
+                char
+            )
 
-    escaped = html.escape(line)
+            if STATIC:
 
-    svg.append(
-        f'''
-        <text
-            x="0"
-            y="{y}"
-            fill="{TEXT_COLOR}"
-            font-family="monospace"
-            font-size="{FONT_SIZE}px"
-            xml:space="preserve"
-            clip-path="url(#clip-{i})">{escaped}</text>
-        '''
-    )
+                svg.append(
+                    f'''
+<text
+    x="{x}"
+    y="{y}"
+    fill="{TEXT_COLOR}"
+    font-family="monospace"
+    font-size="{FONT_SIZE}px">{escaped}</text>
+'''
+                )
+
+            else:
+
+                svg.append(
+                    f'''
+<text
+    x="{x}"
+    y="{y}"
+    fill="{TEXT_COLOR}"
+    font-family="monospace"
+    font-size="{FONT_SIZE}px"
+    opacity="0">{escaped}
+
+    <set
+        attributeName="opacity"
+        to="1"
+        begin="{current_time:.4f}s"
+        fill="freeze"
+    />
+
+</text>
+'''
+                )
 
 
-# ---------------------------------------
-# Cursor
-# ---------------------------------------
+        # Every column consumes typing time,
+        # including spaces.
+        current_time += CHAR_DELAY
 
-for i in range(rows):
 
-    y = i * LINE_HEIGHT
+    # Pause before starting next row
+    current_time += ROW_PAUSE
 
-    delay = i * 0.035
 
-    svg.append(
-        f'''
-        <rect
-            x="0"
-            y="{y}"
-            width="5"
-            height="{LINE_HEIGHT}"
-            fill="{TEXT_COLOR}"
-            opacity="0">
+# ============================================================
+# CURSOR
+#
+# This is also generated position-by-position.
+#
+# A tiny cursor appears at the current character,
+# disappears, then appears at the next one.
+# ============================================================
 
-            <animate
-                attributeName="opacity"
-                values="0;1;1;0"
-                dur="1.2s"
-                begin="{delay}s"
-                fill="freeze"
-            />
+if not STATIC:
 
-            <animate
-                attributeName="x"
-                from="0"
-                to="{WIDTH}"
-                dur="1.2s"
-                begin="{delay}s"
-                fill="freeze"
-            />
+    cursor_time = 0.0
 
-        </rect>
-        '''
-    )
+    for row in range(rows):
 
+        y = row * LINE_HEIGHT
+
+        for col in range(COLS):
+
+            x = col * CHAR_WIDTH
+
+            start = cursor_time
+
+            end = (
+                cursor_time
+                + CHAR_DELAY
+            )
+
+            svg.append(
+                f'''
+<rect
+    x="{x}"
+    y="{y + 1}"
+    width="{CURSOR_WIDTH}"
+    height="{LINE_HEIGHT - 2}"
+    fill="{TEXT_COLOR}"
+    opacity="0">
+
+    <set
+        attributeName="opacity"
+        to="1"
+        begin="{start:.4f}s"
+    />
+
+    <set
+        attributeName="opacity"
+        to="0"
+        begin="{end:.4f}s"
+    />
+
+</rect>
+'''
+            )
+
+            cursor_time += CHAR_DELAY
+
+
+        cursor_time += ROW_PAUSE
+
+
+# ============================================================
+# SAVE SVG
+# ============================================================
 
 svg.append("</svg>")
 
 
-# ---------------------------------------
-# Save SVG
-# ---------------------------------------
+with open(
+    OUTPUT,
+    "w",
+    encoding="utf-8"
+) as file:
 
-with open(OUTPUT, "w", encoding="utf-8") as f:
-    f.write("\n".join(svg))
+    file.write(
+        "\n".join(svg)
+    )
 
+
+# ============================================================
+# OUTPUT INFORMATION
+# ============================================================
 
 print()
-print("ASCII SVG generated successfully!")
-print(f"Grid: {COLS} x {rows}")
-print(f"Output: {OUTPUT}")
+print("ASCII portrait generated")
+print("------------------------")
+
+print(
+    f"Grid: {COLS} x {rows}"
+)
+
+print(
+    f"Characters: {COLS * rows}"
+)
+
+print(
+    f"Animation length: {current_time:.2f}s"
+)
+
+print(
+    f"Output: {OUTPUT}"
+)
+
+if STATIC:
+    print("Mode: STATIC")
+else:
+    print("Mode: TRUE CHARACTER TYPEWRITER")
+
 print()

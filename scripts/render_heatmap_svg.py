@@ -1,12 +1,22 @@
 import json
-import html
-from datetime import datetime
+import os
+
+from datetime import datetime, timedelta
 from pathlib import Path
 
 
-INPUT = Path("data/contributions.json")
-OUTPUT = Path("contrib-heatmap.svg")
+INPUT = Path(
+    "data/contributions.json"
+)
 
+OUTPUT = Path(
+    "contrib-heatmap.svg"
+)
+
+
+# ============================================================
+# APPEARANCE
+# ============================================================
 
 PALETTE = [
     "#161b22",
@@ -16,7 +26,6 @@ PALETTE = [
     "#39d353",
     "#69f0a0",
 ]
-
 
 WIDTH = 860
 HEIGHT = 190
@@ -31,42 +40,150 @@ TEXT = "#8b949e"
 BRIGHT_TEXT = "#c9d1d9"
 BACKGROUND = "#0d1117"
 
+STATIC = os.environ.get("STATIC") == "1"
+
+
+# ============================================================
+# TYPEWRITER SPEED
+# ============================================================
+
+# Delay between individual contribution squares.
+CELL_DELAY = 0.012
+
+# Pause after one complete horizontal row.
+ROW_PAUSE = 0.05
+
+
+# ============================================================
+# LOAD DATA
+# ============================================================
 
 data = json.loads(
-    INPUT.read_text(encoding="utf-8")
+    INPUT.read_text(
+        encoding="utf-8"
+    )
 )
 
 days = data["days"]
 stats = data["stats"]
 
 
-# ----------------------------------
-# Organize contributions by date
-# ----------------------------------
+# ============================================================
+# DATE MAP
+# ============================================================
 
 by_date = {
-    d["date"]: d
-    for d in days
+    day["date"]: day
+    for day in days
 }
 
 
 dates = sorted(
-    datetime.strptime(d["date"], "%Y-%m-%d").date()
-    for d in days
+    datetime.strptime(
+        day["date"],
+        "%Y-%m-%d"
+    ).date()
+    for day in days
 )
 
 
-first = dates[0]
+if not dates:
 
-# Move back to Sunday
+    raise RuntimeError(
+        "No contribution dates found."
+    )
+
+
+first = dates[0]
+last = dates[-1]
+
+
+# ============================================================
+# FIND STARTING SUNDAY
+# ============================================================
+
 start = first
 
 while start.weekday() != 6:
-    from datetime import timedelta
-    start -= timedelta(days=1)
 
+    start -= timedelta(
+        days=1
+    )
+
+
+# ============================================================
+# BUILD CALENDAR GRID
+# ============================================================
+
+weeks = []
+
+
+current = start
+
+
+while current <= last:
+
+    days_since_start = (
+        current - start
+    ).days
+
+    week_index = (
+        days_since_start // 7
+    )
+
+
+    while len(weeks) <= week_index:
+
+        weeks.append(
+            [None] * 7
+        )
+
+
+    weekday = (
+        current.weekday() + 1
+    ) % 7
+
+
+    key = current.isoformat()
+
+
+    info = by_date.get(
+        key,
+        {
+            "count": 0,
+            "level": 0
+        }
+    )
+
+
+    weeks[week_index][weekday] = {
+        "date": key,
+        "count": int(
+            info.get(
+                "count",
+                0
+            )
+        ),
+        "level": int(
+            info.get(
+                "level",
+                0
+            )
+        )
+    }
+
+
+    current += timedelta(
+        days=1
+    )
+
+
+# ============================================================
+# SVG START
+# ============================================================
 
 svg = []
+
 
 svg.append(
     f'''
@@ -78,6 +195,10 @@ svg.append(
 '''
 )
 
+
+# ============================================================
+# BACKGROUND
+# ============================================================
 
 svg.append(
     f'''
@@ -91,42 +212,9 @@ svg.append(
 )
 
 
-# ----------------------------------
-# CSS animation
-# ----------------------------------
-
-svg.append(
-    '''
-<style>
-
-.day {
-    opacity: 0;
-    transform: translateY(-8px);
-    animation: reveal .4s ease forwards;
-}
-
-@keyframes reveal {
-
-    from {
-        opacity: 0;
-        transform: translateY(-8px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-
-}
-
-</style>
-'''
-)
-
-
-# ----------------------------------
-# Day labels
-# ----------------------------------
+# ============================================================
+# WEEKDAY LABELS
+# ============================================================
 
 labels = [
     ("Mon", 1),
@@ -134,9 +222,15 @@ labels = [
     ("Fri", 5)
 ]
 
+
 for label, row in labels:
 
-    y = GRID_Y + row * (CELL + GAP) + 9
+    y = (
+        GRID_Y
+        + row * (CELL + GAP)
+        + 9
+    )
+
 
     svg.append(
         f'''
@@ -145,97 +239,230 @@ for label, row in labels:
     y="{y}"
     fill="{TEXT}"
     font-family="monospace"
-    font-size="10">
-    {label}
-</text>
+    font-size="10">{label}</text>
 '''
     )
 
 
-# ----------------------------------
-# Contribution cells
-# ----------------------------------
+# ============================================================
+# TRUE ROW-BY-ROW CELL PRINTING
+#
+# IMPORTANT:
+#
+# We iterate:
+#
+#     row
+#       ↓
+#     column
+#
+# NOT:
+#
+#     week
+#       ↓
+#     weekday
+#
+# Therefore:
+#
+# row 0:
+#   col 0 -> col 52
+#
+# THEN row 1:
+#   col 0 -> col 52
+#
+# etc.
+# ============================================================
 
-from datetime import timedelta
+current_time = 0.15
 
 
-current = start
+for row in range(7):
 
-end = dates[-1]
+    for week_index in range(
+        len(weeks)
+    ):
 
-week = 0
+        cell_info = (
+            weeks[week_index][row]
+        )
 
 
-while current <= end:
+        # Some edge cells may be outside
+        # GitHub's returned date range.
+        if cell_info is None:
 
-    weekday = (
-        current.weekday() + 1
-    ) % 7
+            current_time += CELL_DELAY
+            continue
 
-    key = current.isoformat()
 
-    info = by_date.get(
-        key,
-        {
-            "count": 0,
-            "level": 0
-        }
-    )
+        level = min(
+            cell_info["level"],
+            len(PALETTE) - 1
+        )
 
-    level = min(
-        int(info["level"]),
-        len(PALETTE) - 1
-    )
 
-    count = info["count"]
+        count = (
+            cell_info["count"]
+        )
 
-    x = GRID_X + week * (CELL + GAP)
+        date = (
+            cell_info["date"]
+        )
 
-    y = GRID_Y + weekday * (CELL + GAP)
 
-    delay = (
-        week * 0.015
-        + weekday * 0.025
-    )
+        color = (
+            PALETTE[level]
+        )
 
-    color = PALETTE[level]
 
-    svg.append(
-        f'''
+        x = (
+            GRID_X
+            + week_index
+            * (CELL + GAP)
+        )
+
+
+        y = (
+            GRID_Y
+            + row
+            * (CELL + GAP)
+        )
+
+
+        if STATIC:
+
+            svg.append(
+                f'''
 <rect
-    class="day"
+    x="{x}"
+    y="{y}"
+    width="{CELL}"
+    height="{CELL}"
+    rx="2"
+    fill="{color}">
+
+    <title>{count} contributions on {date}</title>
+
+</rect>
+'''
+            )
+
+        else:
+
+            svg.append(
+                f'''
+<rect
     x="{x}"
     y="{y}"
     width="{CELL}"
     height="{CELL}"
     rx="2"
     fill="{color}"
-    style="animation-delay:{delay:.3f}s">
+    opacity="0">
 
-    <title>
-        {count} contributions on {key}
-    </title>
+    <title>{count} contributions on {date}</title>
+
+    <set
+        attributeName="opacity"
+        to="1"
+        begin="{current_time:.4f}s"
+        fill="freeze"
+    />
 
 </rect>
 '''
-    )
-
-    current += timedelta(days=1)
-
-    if weekday == 6:
-        week += 1
+            )
 
 
-# ----------------------------------
-# Legend
-# ----------------------------------
+        current_time += CELL_DELAY
 
-legend_y = 155
+
+    # Finished this horizontal row.
+    current_time += ROW_PAUSE
+
+
+# ============================================================
+# CELL CURSOR
+# ============================================================
+
+if not STATIC:
+
+    cursor_time = 0.15
+
+
+    for row in range(7):
+
+        for week_index in range(
+            len(weeks)
+        ):
+
+            x = (
+                GRID_X
+                + week_index
+                * (CELL + GAP)
+            )
+
+
+            y = (
+                GRID_Y
+                + row
+                * (CELL + GAP)
+            )
+
+
+            start_time = cursor_time
+
+            end_time = (
+                cursor_time
+                + CELL_DELAY
+            )
+
+
+            svg.append(
+                f'''
+<rect
+    x="{x}"
+    y="{y}"
+    width="{CELL}"
+    height="{CELL}"
+    rx="2"
+    fill="{BRIGHT_TEXT}"
+    opacity="0">
+
+    <set
+        attributeName="opacity"
+        to="0.75"
+        begin="{start_time:.4f}s"
+    />
+
+    <set
+        attributeName="opacity"
+        to="0"
+        begin="{end_time:.4f}s"
+    />
+
+</rect>
+'''
+            )
+
+
+            cursor_time += CELL_DELAY
+
+
+        cursor_time += ROW_PAUSE
+
+
+# ============================================================
+# LEGEND
+# ============================================================
+
+legend_y = 145
+legend_x = 620
+
 
 svg.append(
     f'''
 <text
-    x="560"
+    x="{legend_x - 38}"
     y="{legend_y + 10}"
     fill="{TEXT}"
     font-family="monospace"
@@ -246,11 +473,15 @@ svg.append(
 )
 
 
-legend_x = 600
+for i, color in enumerate(
+    PALETTE
+):
 
-for i, color in enumerate(PALETTE):
+    x = (
+        legend_x
+        + i * 16
+    )
 
-    x = legend_x + i * 16
 
     svg.append(
         f'''
@@ -266,10 +497,17 @@ for i, color in enumerate(PALETTE):
     )
 
 
+more_x = (
+    legend_x
+    + len(PALETTE) * 16
+    + 3
+)
+
+
 svg.append(
     f'''
 <text
-    x="{legend_x + len(PALETTE) * 16 + 3}"
+    x="{more_x}"
     y="{legend_y + 10}"
     fill="{TEXT}"
     font-family="monospace"
@@ -280,30 +518,114 @@ svg.append(
 )
 
 
-# ----------------------------------
-# Statistics
-# ----------------------------------
+# ============================================================
+# STATISTICS
+# ============================================================
 
-total = stats["total"]
-current_streak = stats["current_streak"]
-longest = stats["longest_streak"]
-
-
-svg.append(
-    f'''
-<text
-    x="55"
-    y="165"
-    fill="{BRIGHT_TEXT}"
-    font-family="monospace"
-    font-size="11">
-    {total:,} contributions ·
-    current streak {current_streak} days ·
-    longest streak {longest} days
-</text>
-'''
+total = int(
+    stats.get(
+        "total",
+        0
+    )
 )
 
+current_streak = int(
+    stats.get(
+        "current_streak",
+        0
+    )
+)
+
+longest = int(
+    stats.get(
+        "longest_streak",
+        0
+    )
+)
+
+
+footer = (
+    f"{total:,} contributions"
+    f" · current streak {current_streak} days"
+    f" · longest streak {longest} days"
+)
+
+
+# ============================================================
+# TYPE FOOTER CHARACTER-BY-CHARACTER
+# ============================================================
+
+FOOTER_X = GRID_X
+FOOTER_Y = 165
+
+FOOTER_CHAR_WIDTH = 6.6
+FOOTER_CHAR_DELAY = 0.010
+
+
+for index, char in enumerate(
+    footer
+):
+
+    x = (
+        FOOTER_X
+        + index * FOOTER_CHAR_WIDTH
+    )
+
+
+    if char == " ":
+
+        current_time += (
+            FOOTER_CHAR_DELAY
+        )
+
+        continue
+
+
+    if STATIC:
+
+        svg.append(
+            f'''
+<text
+    x="{x:.2f}"
+    y="{FOOTER_Y}"
+    fill="{BRIGHT_TEXT}"
+    font-family="monospace"
+    font-size="11">{char}</text>
+'''
+        )
+
+    else:
+
+        svg.append(
+            f'''
+<text
+    x="{x:.2f}"
+    y="{FOOTER_Y}"
+    fill="{BRIGHT_TEXT}"
+    font-family="monospace"
+    font-size="11"
+    opacity="0">{char}
+
+    <set
+        attributeName="opacity"
+        to="1"
+        begin="{current_time:.4f}s"
+        fill="freeze"
+    />
+
+</text>
+'''
+        )
+
+
+    current_time += (
+        FOOTER_CHAR_DELAY
+    )
+
+
+# ============================================================
+# SAVE
+# ============================================================
 
 svg.append("</svg>")
 
@@ -314,4 +636,25 @@ OUTPUT.write_text(
 )
 
 
-print(f"Generated {OUTPUT}")
+print()
+print("Contribution heatmap generated")
+print("------------------------------")
+
+print(
+    f"Weeks: {len(weeks)}"
+)
+
+print(
+    f"Animation length: {current_time:.2f}s"
+)
+
+print(
+    f"Output: {OUTPUT}"
+)
+
+if STATIC:
+    print("Mode: STATIC")
+else:
+    print("Mode: TRUE ROW-BY-ROW TYPEWRITER")
+
+print()
